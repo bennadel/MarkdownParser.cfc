@@ -8,6 +8,14 @@ by [Ben Nadel][bennadel] (on [Google+][google-plus])
 I want to try and build a Markdown parser in ColdFusion (that doesn't defer
 to a Java library for the actual parsing).
 
+Here is a lazy blockquote:
+
+> There is something over here
+that I thought you would find interesting.
+But, maybe not??
+
+> Awesome sauce!
+
 ## Inspiration
    
 The following libraries formed much of what I put together in my ColdFusion 

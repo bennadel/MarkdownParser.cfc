@@ -15,14 +15,13 @@ component
 		markdownContent = input;		
 		htmlContent = "";
 
-		// I hold the bibliography-style reference links that will be replaced into the
-		// content during the parsing process. Each link will be "keyed" based on the 
-		// reference number.
-		referenceLinks = {};
-
 		// Set up some easy-to-read refernces to character formations.
 		linebreak = chr( 10 );
 		doubleLinebreak = ( linebreak & linebreak );
+
+		// Cache the pattern/matcher classes for static method references.
+		patternClass = createObject( "java", "java.util.regex.Pattern" );
+		matcherClass = createObject( "java", "java.util.regex.Matcher" );
 
 		return( this );
 
@@ -65,12 +64,17 @@ component
 		normalizeLineBreaks();
 		normalizeEmptyLines();
 		normalizeTabs();
-		extractReferenceLinks();
+		normalizeBlockquotes();
+
+		// applyReferenceLinks();
+
+
+
+		// extractReferenceLinks();
 
 		var lines = getLinesOfContent();
 
 		writeDump(lines);
-		writeDump(referenceLinks);
 		abort;
 
 
@@ -86,6 +90,29 @@ component
 	// ---
 
 
+	private void function applyReferneceLink(
+		required string name,
+		required string value
+		) {
+
+
+
+	}
+
+
+	private void function applyReferenceLinks() {
+
+		var referenceLinks = extractReferenceLinks();
+
+		for ( var linkName in referneceLinks ) {
+
+			applyReferneceLink( linkName, referneceLinks[ linkName ] );
+
+		}
+
+	}
+
+
 	// I return a Java pattern matcher for the given content and given Java regular
 	// expression pattern.
 	private any function createMatcher(
@@ -93,7 +120,7 @@ component
 		required string pattern
 		) {
 
-		var matcher = createObject( "java", "java.util.regex.Pattern" )
+		var matcher = patternClass
 			.compile( javaCast( "string", pattern ) )
 			.matcher( javaCast( "string", content ) )
 		;
@@ -113,22 +140,25 @@ component
 	}
 
 
-	// I extract the reference links. The reference links are the bibliography-style
-	// links in the format of:
+	// I extract and return the reference link, leaving the html content free of rerence 
+	// links. The reference links are the bibliography-style links in the format of:
 	// --
 	// [1]: http://www.bennadel.com
 	// [ben-nadel]: http://www.bennadel.com
 	// --
 	// Currently, the only resticted characters in the link "name", are "[", "]", ":", "\n".
-	private void function extractReferenceLinks() {
+	private struct function extractReferenceLinks() {
 
 		var matcher = createMatcher( htmlContent, "(?m)^\[([^\[\]\n:]+)\]:([^\n]*)\n?" );
 		var buffer = createStringBuffer();
 
+		// I hold the key-based dictionary for the links.
+		var referenceLinks = {};
+
 		while ( matcher.find() ) {
 
 			// Since we are extracing the links, leave out replacement content.
-			matcher.appendReplacement( buffer, "" );
+			matcher.appendReplacement( buffer, javaCast( "string", "" ) );
 
 			var linkName = lcase( matcher.group( javaCast( "int", 1 ) ) );
 			var linkValue = trim( matcher.group( javaCast( "int", 2 ) ) );
@@ -141,6 +171,8 @@ component
 
 		htmlContent = trim( buffer.toString() );
 
+		return( referenceLinks );
+
 	}
 
 
@@ -151,6 +183,32 @@ component
 		return(
 			reMatchAll( htmlContent, "(?m)^[^\n]*" )
 		);
+
+	}
+
+
+	// Blockquotes can be lazy, meaning that the ">" character is only on the first line 
+	// of the block of text. Let's remove any line breaks from that text to keep the 
+	// blockquote item on a single line.
+	private void function normalizeBlockquotes() {
+
+		var matcher = createMatcher( htmlContent, "(?m)^>[^\n]*(\n[^>\n][^\n]+)+" );
+		var buffer = createStringBuffer();
+
+		while ( matcher.find() ) {
+
+			matcher.appendReplacement(
+				buffer,
+				quoteReplacement(
+					reReplaceAll( matcher.group(), "\n", " " )
+				)
+			);
+
+		}
+
+		matcher.appendTail( buffer );
+
+		htmlContent = buffer.toString();
 
 	}
 
@@ -190,13 +248,22 @@ component
 			var tabCount = len( matcher.group() );
 			var spaces = repeatString( "    ", tabCount );
 
-			matcher.appendReplacement( buffer, spaces );
+			matcher.appendReplacement( buffer, javaCast( "string", spaces ) );
 
 		}
 
 		matcher.appendTail( buffer );
 
 		htmlContent = buffer.toString();
+
+	}
+
+
+	private string function quoteReplacement( required string pattern ) {
+
+		return(
+			matcherClass.quoteReplacement( javaCast( "string", pattern ) )
+		);
 
 	}
 
@@ -226,15 +293,13 @@ component
 		required string content,
 		required string pattern,
 		string replacement = "",
-		boolean quoteReplacement = false
+		boolean isQuoteReplacement = false
 		) {
 
 		// If desired, escape special characters in the replcaement text.
-		if ( quoteReplacement ) {
+		if ( isQuoteReplacement ) {
 
-			replacement = createObject( "java", "java.util.regex.Pattern" ).quote(
-				javaCast( "string", replacement )
-			);
+			replacement = quoteReplacement( replacement );
 
 		}
 
